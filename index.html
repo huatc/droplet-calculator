@@ -66,6 +66,10 @@ details { margin-top: 6px; }
 details summary { cursor: pointer; font-weight: 600; }
 details p, details li { color: var(--muted); font-size: 14px; }
 details a { color: var(--accent); }
+details h4 { font-size: 14px; margin: 14px 0 4px; }
+details ul { padding-left: 20px; }
+.trust td, .trust th { color: var(--muted); font-size: 14px; vertical-align: top; }
+.trust td:first-child { white-space: nowrap; padding-right: 12px; }
 .refs { padding-left: 20px; }
 code { font-size: 13px; }
 .err { color: var(--jet); font-weight: 600; }
@@ -192,13 +196,49 @@ code { font-size: 13px; }
       </details>
       <details>
         <summary>How droplet size is estimated</summary>
+        <p>The size is found in two steps: a size is calculated for <strong>pure dripping</strong> (a formula specific to each geometry) and for <strong>pure jetting</strong>, and the transition parameter S then selects or blends them.</p>
+        <h4>1. Dripping size, by geometry</h4>
         <ul>
-          <li>T-junction squeezing: plug length <code>L/w = 1 + Q<sub>d</sub>/Q<sub>c</sub></code> (<a href="https://doi.org/10.1039/b510841a" target="_blank" rel="noopener">Garstecki 2006</a>); dripping: size decreases as <code>Ca<sup>−1/4</sup></code> from that value.</li>
-          <li>Flow-focusing dripping: empirical scaling <code>d/w ≈ 0.9 (Q<sub>d</sub>/Q<sub>c</sub>)<sup>0.3</sup> Ca<sub>c</sub><sup>−0.2</sup></code>.</li>
-          <li>Co-flow dripping: drag–tension balance <code>d ≈ d<sub>tip</sub>(1 + 1/(3Ca′))</code>, Ca′ based on the slip velocity U<sub>c</sub>−U<sub>d</sub> (<a href="https://doi.org/10.1021/la990101e" target="_blank" rel="noopener">Umbanhowar et al., Langmuir 16, 347, 2000</a>).</li>
-          <li>Jetting: jet diameter from mass conservation in plug flow, <code>d<sub>jet</sub> = √(4A<sub>out</sub>/π · Q<sub>d</sub>/(Q<sub>d</sub>+Q<sub>c</sub>))</code>; Rayleigh–Plateau breakup gives <code>d ≈ 1.89 d<sub>jet</sub></code>.</li>
-          <li>In the transitional band the size is interpolated (log scale) between the two estimates. Drops larger than the channel are reported as confined plugs; the size shown is the equivalent-sphere diameter.</li>
+          <li><strong>T-junction, squeezing (Ca<sub>c</sub> &lt; 0.01)</strong> (<a href="https://doi.org/10.1039/b510841a" target="_blank" rel="noopener">Garstecki et al. 2006</a>): the forming drop blocks the channel and is pinched off by the pressure building up behind it. Plug length <code>L/w = 1 + Q<sub>d</sub>/Q<sub>c</sub></code>.
+            The plug volume is <code>V ≈ w·h·(L − w/4)</code> (w/4 allows for the rounded ends) and the reported size is the equivalent-sphere diameter <code>d = (6V/π)<sup>1/3</sup></code>.</li>
+          <li><strong>T-junction, dripping (Ca<sub>c</sub> ≥ 0.01)</strong>: shear pinches the drop off earlier, so the size shrinks as <code>d ∝ Ca<sub>c</sub><sup>−1/4</sup></code>, starting from the squeezing value at Ca<sub>c</sub> = 0.01. Published exponents are roughly −0.2 to −0.25.</li>
+          <li><strong>Flow-focusing</strong>: <code>d/w ≈ 0.9 · (Q<sub>d</sub>/Q<sub>c</sub>)<sup>0.3</sup> · Ca<sub>c</sub><sup>−0.2</sup></code>, with Q<sub>c</sub> counting both side channels. More dispersed flow gives larger drops; more shear gives smaller ones.
+            The trends and approximate exponents match published flow-focusing studies, but the constants 0.9, 0.3 and −0.2 are typical values chosen for this app, not taken from one paper. This is the formula that most needs calibrating against your device.</li>
+          <li><strong>Co-flow</strong> (<a href="https://doi.org/10.1021/la990101e" target="_blank" rel="noopener">Umbanhowar et al. 2000</a>): the drop stays on the tip until the outer fluid's drag beats the interfacial tension holding it,
+            <code>3π·μ<sub>c</sub>·(d − d<sub>tip</sub>)·(U<sub>c</sub> − U<sub>d</sub>) ≈ π·d<sub>tip</sub>·γ</code>, which gives
+            <code>d ≈ d<sub>tip</sub>·(1 + 1/(3Ca′))</code> with <code>Ca′ = μ<sub>c</sub>(U<sub>c</sub> − U<sub>d</sub>)/γ</code>.
+            The slip velocity is kept at no less than 5% of U<sub>c</sub>, and the size is capped at the outer tube diameter D.</li>
         </ul>
+        <h4>2. Jetting size (all geometries)</h4>
+        <ul>
+          <li><strong>Jet diameter from mass conservation</strong>: assuming both phases move at the same speed in the outlet (plug flow), the jet takes up the same share of the outlet area as its share of the total flow,
+            <code>d<sub>jet</sub> = √((4/π)·A<sub>out</sub>·Q<sub>d</sub>/(Q<sub>d</sub> + Q<sub>c</sub>))</code>.</li>
+          <li><strong>Rayleigh–Plateau breakup</strong>: a thread breaks up fastest for disturbances with wavelength <code>λ ≈ 4.51·d<sub>jet</sub></code>, and each wavelength becomes one drop.
+            Equating volumes, <code>(π/4)·d<sub>jet</sub>²·4.51·d<sub>jet</sub> = (π/6)·d³</code>, gives <code>d ≈ 1.89·d<sub>jet</sub></code>.</li>
+        </ul>
+        <h4>3. Combining them with S</h4>
+        <ul>
+          <li>S &lt; 0.7: dripping size. S &gt; 1.3: jetting size.</li>
+          <li>In between, the two are blended in log scale: with <code>t = (S − 0.7)/0.6</code>, <code>ln d = (1 − t)·ln d<sub>drip</sub> + t·ln d<sub>jet drop</sub></code>. This avoids a sudden jump in size at the boundary.</li>
+        </ul>
+        <h4>4. Quantities derived from the size</h4>
+        <ul>
+          <li><strong>Generation rate</strong>: <code>f = Q<sub>d</sub> / (π d³/6)</code>, the dispersed flow rate divided by the volume of one drop.</li>
+          <li><strong>Confinement</strong>: drops larger than the smallest channel dimension (or about D for co-flow) are flagged as plugs. The size shown is then the equivalent-sphere diameter, not what a top-down image would show.</li>
+          <li><strong>Parallel flow (T-junction)</strong>: a size is still calculated, but no drops actually form in this regime.</li>
+        </ul>
+        <h4>How far to trust the size</h4>
+        <table class="trust">
+          <thead><tr><th>Situation</th><th>Confidence</th></tr></thead>
+          <tbody>
+            <tr><td>T-junction squeezing</td><td>Good: a well-tested scaling, typically within about 10–20%</td></tr>
+            <tr><td>Co-flow dripping</td><td>Moderate: a simplified force balance</td></tr>
+            <tr><td>Jetting</td><td>Moderate: plug flow is assumed, but in real channels the centre moves faster, giving thinner jets and smaller drops. Very viscous threads break at longer wavelengths (Tomotika), giving larger drops than 1.89·d<sub>jet</sub>.</td></tr>
+            <tr><td>Flow-focusing dripping</td><td>Rough: trends are right, but the constants need calibrating</td></tr>
+            <tr><td>Transitional band</td><td>Rough: the blend is a smooth guess, not physics</td></tr>
+          </tbody>
+        </table>
+        <p>The sizes are best used for trends and order of magnitude. Measured drop sizes from your own device are the way to pin down the constants.</p>
       </details>
       <details>
         <summary>How dispersity is estimated</summary>
