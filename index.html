@@ -1,0 +1,744 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Droplet Regime Calculator</title>
+<style>
+:root {
+  --bg: #f6f7f9; --panel: #ffffff; --ink: #1b1f24; --muted: #5d6673; --line: #dde1e6;
+  --accent: #1f6feb; --drip: #1a7f37; --trans: #b7791f; --jet: #c2410c;
+  --drip-bg: #e6f4ea; --trans-bg: #fdf3e1; --jet-bg: #fdece4; --map-jet: rgba(194,65,12,.13);
+  --cont: #d6e6fb; --disp: #f07a2a; --glass: #c9d1da; --wall: #7d8896; --chip: #eef1f4;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #0f1216; --panel: #171b21; --ink: #e6e9ee; --muted: #9aa3ae; --line: #2a3038;
+    --accent: #58a6ff; --drip: #4ac26b; --trans: #e3b341; --jet: #f0883e;
+    --drip-bg: #12261a; --trans-bg: #2a2212; --jet-bg: #2d1a10; --map-jet: rgba(240,136,62,.16);
+    --cont: #1c3352; --disp: #f0883e; --glass: #3a434e; --wall: #6b7684; --chip: #12161b;
+  }
+}
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--bg); color: var(--ink);
+  font: 15px/1.5 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
+header { padding: 20px 16px 8px; max-width: 1180px; margin: 0 auto; }
+h1 { font-size: 22px; margin: 0 0 4px; }
+header p { margin: 0; color: var(--muted); }
+main { max-width: 1180px; margin: 0 auto; padding: 12px 16px 40px;
+  display: grid; grid-template-columns: minmax(300px, 400px) 1fr; gap: 16px; }
+@media (max-width: 860px) { main { grid-template-columns: 1fr; } }
+.card { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 14px 16px; }
+.card + .card { margin-top: 16px; }
+h2 { font-size: 13px; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); margin: 0 0 10px; }
+.row { display: grid; grid-template-columns: 1fr 120px; align-items: center; gap: 8px; margin: 6px 0; }
+.row label { font-size: 14px; }
+.row small { color: var(--muted); }
+.row:has(select) { grid-template-columns: 1fr 1.6fr; }
+.in { display: flex; align-items: center; border: 1px solid var(--line); border-radius: 6px; background: var(--bg); }
+.in input { width: 100%; min-width: 0; border: 0; background: transparent; color: var(--ink); padding: 6px 8px; font: inherit; }
+.in span { color: var(--muted); font-size: 12px; padding-right: 8px; white-space: nowrap; }
+select { width: 100%; padding: 7px 8px; border-radius: 6px; border: 1px solid var(--line); background: var(--bg); color: var(--ink); font: inherit; }
+.phase { border-left: 3px solid var(--accent); padding-left: 10px; margin-top: 12px; }
+.phase.d { border-color: var(--jet); }
+.phase h3 { font-size: 14px; margin: 0 0 4px; }
+.verdict { border-radius: 10px; padding: 16px; display: flex; gap: 16px; align-items: center; flex-wrap: wrap; }
+.verdict.drip { background: var(--drip-bg); } .verdict.trans { background: var(--trans-bg); } .verdict.jet { background: var(--jet-bg); }
+.verdict .tag { font-size: 24px; font-weight: 700; }
+.verdict.drip .tag { color: var(--drip); } .verdict.trans .tag { color: var(--trans); } .verdict.jet .tag { color: var(--jet); }
+.verdict .sub { color: var(--muted); font-size: 14px; }
+.kpis { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 10px; margin-top: 14px; }
+.kpi { border: 1px solid var(--line); border-radius: 8px; padding: 10px 12px; }
+.kpi .v { font-size: 22px; font-weight: 650; font-variant-numeric: tabular-nums; }
+.kpi .l { font-size: 12px; color: var(--muted); }
+table { width: 100%; border-collapse: collapse; font-size: 14px; }
+td, th { padding: 6px 4px; border-bottom: 1px solid var(--line); text-align: left; }
+td.num { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
+th { color: var(--muted); font-weight: 500; font-size: 12px; }
+.charts { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+@media (max-width: 1050px) { .charts { grid-template-columns: 1fr; } }
+svg { width: 100%; height: auto; display: block; }
+svg text { fill: var(--muted); font-size: 11px; font-family: inherit; }
+.notes { margin: 10px 0 0; padding-left: 18px; }
+.notes li { margin: 4px 0; }
+.warn { color: var(--jet); }
+details { margin-top: 6px; }
+details summary { cursor: pointer; font-weight: 600; }
+details p, details li { color: var(--muted); font-size: 14px; }
+details a { color: var(--accent); }
+.refs { padding-left: 20px; }
+code { font-size: 13px; }
+.err { color: var(--jet); font-weight: 600; }
+.animhead { display: flex; justify-content: space-between; align-items: center; gap: 8px; margin-bottom: 10px; }
+.animhead h2 { margin: 0; }
+.animhead button { font: inherit; font-size: 13px; padding: 5px 12px; border-radius: 6px; border: 1px solid var(--line); background: var(--bg); color: var(--ink); cursor: pointer; }
+#anim { width: 100%; aspect-ratio: 760 / 240; display: block; border-radius: 8px; }
+.axisctl { display: flex; flex-wrap: wrap; gap: 10px; font-size: 13px; color: var(--muted); margin-bottom: 6px; }
+.axisctl label { display: flex; align-items: center; gap: 6px; }
+.axisctl .in { width: 96px; }
+.legend { display: flex; flex-wrap: wrap; gap: 14px; font-size: 13px; color: var(--muted); margin-top: 8px; }
+.legend i { display: inline-block; width: 12px; height: 12px; border-radius: 3px; vertical-align: -2px; margin-right: 5px; }
+</style>
+</head>
+<body>
+<header>
+  <h1>Droplet Regime Calculator</h1>
+  <p>Predict dripping vs. jetting and estimate droplet size and dispersity for two-phase microfluidic flow.</p>
+</header>
+
+<main>
+  <section>
+    <div class="card">
+      <h2>Device</h2>
+      <div class="row"><label for="geom">Geometry</label>
+        <select id="geom">
+          <option value="ff">Flow-focusing</option>
+          <option value="tj">T-junction</option>
+          <option value="cf">Co-flow (capillary)</option>
+        </select></div>
+      <div id="rect">
+        <div class="row"><label for="w">Channel width <small>w</small></label><div class="in"><input id="w" type="number" step="any" value="50"><span>µm</span></div></div>
+        <div class="row"><label for="h">Channel depth <small>h</small></label><div class="in"><input id="h" type="number" step="any" value="50"><span>µm</span></div></div>
+      </div>
+      <div id="coflow" hidden>
+        <div class="row"><label for="dtip">Inner tip diameter</label><div class="in"><input id="dtip" type="number" step="any" value="40"><span>µm</span></div></div>
+        <div class="row"><label for="D">Outer channel diameter</label><div class="in"><input id="D" type="number" step="any" value="400"><span>µm</span></div></div>
+      </div>
+      <div class="row"><label for="preset">Quick-fill fluids <small>(optional)</small></label>
+        <select id="preset">
+          <option value="">Custom: type your own values</option>
+          <option value="hfe" selected>Water in HFE-7500 + surfactant</option>
+          <option value="min">Water in mineral oil + Span 80</option>
+          <option value="sil">Silicone oil (50 cSt) in water + SDS</option>
+          <option value="gly">50% glycerol in hexadecane + Span 80</option>
+        </select></div>
+      <div class="row"><label for="gamma">Interfacial tension <small>γ</small></label><div class="in"><input id="gamma" type="number" step="any" value="5"><span>mN/m</span></div></div>
+      <p style="color:var(--muted);font-size:13px;margin:8px 0 0">Presets only fill in the fields. You can use any fluid pair: type its viscosities, densities and interfacial tension directly into the fields. The preset switches to “Custom” automatically.</p>
+    </div>
+
+    <div class="card">
+      <h2>Phases</h2>
+      <div class="phase">
+        <h3>Continuous phase</h3>
+        <div class="row"><label for="Uc">Velocity <small>U<sub>c</sub></small></label><div class="in"><input id="Uc" type="number" step="any" value="100"><span>mm/s</span></div></div>
+        <div class="row"><label for="muc">Viscosity <small>μ<sub>c</sub></small></label><div class="in"><input id="muc" type="number" step="any" value="1.24"><span>mPa·s</span></div></div>
+        <div class="row"><label for="rhoc">Density <small>ρ<sub>c</sub></small></label><div class="in"><input id="rhoc" type="number" step="any" value="1614"><span>kg/m³</span></div></div>
+      </div>
+      <div class="phase d">
+        <h3>Dispersed phase</h3>
+        <div class="row"><label for="Ud">Velocity <small>U<sub>d</sub></small></label><div class="in"><input id="Ud" type="number" step="any" value="20"><span>mm/s</span></div></div>
+        <div class="row"><label for="mud">Viscosity <small>μ<sub>d</sub></small></label><div class="in"><input id="mud" type="number" step="any" value="1"><span>mPa·s</span></div></div>
+        <div class="row"><label for="rhod">Density <small>ρ<sub>d</sub></small></label><div class="in"><input id="rhod" type="number" step="any" value="1000"><span>kg/m³</span></div></div>
+      </div>
+      <p style="color:var(--muted);font-size:13px;margin:10px 0 0" id="velnote"></p>
+    </div>
+  </section>
+
+  <section>
+    <div class="card">
+      <div id="verdict" class="verdict"></div>
+      <div class="kpis" id="kpis"></div>
+      <ul class="notes" id="notes"></ul>
+    </div>
+
+    <div class="card">
+      <div class="animhead"><h2>Device &amp; flow animation</h2><button id="play" type="button">Pause</button></div>
+      <canvas id="anim"></canvas>
+      <div class="legend">
+        <span><i style="background:var(--cont);border:1px solid var(--wall)"></i>Continuous phase</span>
+        <span><i style="background:var(--disp)"></i>Dispersed phase</span>
+        <span id="animnote"></span>
+      </div>
+    </div>
+
+    <div class="card charts">
+      <div>
+        <h2>Regime map</h2>
+        <svg id="map" viewBox="0 0 420 330" role="img" aria-label="Regime map of capillary number versus Weber number"></svg>
+      </div>
+      <div>
+        <h2>Estimated size distribution</h2>
+        <div class="axisctl">
+          <label>x-axis from <span class="in"><input id="xmin" type="number" step="any" value="0"><span>µm</span></span></label>
+          <label>to <span class="in"><input id="xmax" type="number" step="any" value="200"><span>µm</span></span></label>
+        </div>
+        <svg id="dist" viewBox="0 0 420 330" role="img" aria-label="Estimated droplet size distribution"></svg>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>Dimensionless numbers</h2>
+      <table><thead><tr><th>Quantity</th><th>Definition</th><th style="text-align:right">Value</th></tr></thead>
+      <tbody id="dimless"></tbody></table>
+      <p style="color:var(--muted);font-size:13px;margin:10px 0 0">Ca* and We* are the critical values at which viscous shear or inertia alone would cause jetting. They depend on the device geometry:
+        flow-focusing Ca* ≈ 0.2, T-junction Ca* ≈ 0.1, co-flow Ca* ≈ 1, with We* ≈ 1 for all three.
+        S &lt; 0.7 → dripping, 0.7–1.3 → transitional, S &gt; 1.3 → jetting.</p>
+    </div>
+
+    <div class="card">
+      <h2>Method &amp; assumptions</h2>
+      <details>
+        <summary>How the regime is decided</summary>
+        <p>The transition from dripping to jetting is governed by two forces overcoming interfacial tension:
+        viscous shear from the continuous phase (capillary number <code>Ca<sub>c</sub> = μ<sub>c</sub>U<sub>c</sub>/γ</code>) and inertia of the dispersed phase (Weber number <code>We<sub>d</sub> = ρ<sub>d</sub>U<sub>d</sub>²L/γ</code>).
+        Following <a href="https://doi.org/10.1103/PhysRevLett.99.094502" target="_blank" rel="noopener">Utada et al. (2007)</a>, the transition is approximated as <code>S = Ca<sub>c</sub>/Ca* + We<sub>d</sub>/We* ≈ 1</code>,
+        where the critical values Ca* and We* depend on the geometry of the microfluidic device (listed below):
+        S &lt; 0.7 → dripping, 0.7–1.3 → transitional, &gt; 1.3 → jetting. Jets driven mainly by Ca are <em>narrowing</em> jets; jets driven mainly by We are <em>widening</em> jets.</p>
+        <ul>
+          <li>Co-flow: Ca* ≈ 1, We* ≈ 1 (<a href="https://doi.org/10.1103/PhysRevLett.99.094502" target="_blank" rel="noopener">Utada et al., PRL 99, 094502, 2007</a>).</li>
+          <li>Flow-focusing: Ca* ≈ 0.2, We* ≈ 1 (<a href="https://doi.org/10.1063/1.2911716" target="_blank" rel="noopener">Cubaud &amp; Mason, Phys. Fluids 20, 053302, 2008</a>). Ca<sub>c</sub> &lt; 0.01 is labelled squeezing.</li>
+          <li>T-junction: Ca* ≈ 0.1, We* ≈ 1; squeezing below Ca<sub>c</sub> ≈ 0.01 (<a href="https://doi.org/10.1039/b510841a" target="_blank" rel="noopener">Garstecki et al., Lab Chip 6, 437, 2006</a>). Q<sub>d</sub>/Q<sub>c</sub> &gt; 4 with Ca<sub>c</sub> &gt; 0.01 is flagged as parallel (stratified) flow.</li>
+        </ul>
+      </details>
+      <details>
+        <summary>How droplet size is estimated</summary>
+        <ul>
+          <li>T-junction squeezing: plug length <code>L/w = 1 + Q<sub>d</sub>/Q<sub>c</sub></code> (<a href="https://doi.org/10.1039/b510841a" target="_blank" rel="noopener">Garstecki 2006</a>); dripping: size decreases as <code>Ca<sup>−1/4</sup></code> from that value.</li>
+          <li>Flow-focusing dripping: empirical scaling <code>d/w ≈ 0.9 (Q<sub>d</sub>/Q<sub>c</sub>)<sup>0.3</sup> Ca<sub>c</sub><sup>−0.2</sup></code>.</li>
+          <li>Co-flow dripping: drag–tension balance <code>d ≈ d<sub>tip</sub>(1 + 1/(3Ca′))</code>, Ca′ based on the slip velocity U<sub>c</sub>−U<sub>d</sub> (<a href="https://doi.org/10.1021/la990101e" target="_blank" rel="noopener">Umbanhowar et al., Langmuir 16, 347, 2000</a>).</li>
+          <li>Jetting: jet diameter from mass conservation in plug flow, <code>d<sub>jet</sub> = √(4A<sub>out</sub>/π · Q<sub>d</sub>/(Q<sub>d</sub>+Q<sub>c</sub>))</code>; Rayleigh–Plateau breakup gives <code>d ≈ 1.89 d<sub>jet</sub></code>.</li>
+          <li>In the transitional band the size is interpolated (log scale) between the two estimates. Drops larger than the channel are reported as confined plugs; the size shown is the equivalent-sphere diameter.</li>
+        </ul>
+      </details>
+      <details>
+        <summary>How dispersity is estimated</summary>
+        <p>Dispersity is reported as the coefficient of variation CV = σ/d̄ and PDI = CV². These are heuristic values from typical experimental ranges, not first-principles predictions:
+        squeezing ≈ 1.5%, dripping ≈ 2.5%, narrowing jets ≈ 8%, widening (inertial) jets ≈ 20%, rising smoothly through the transitional band.
+        Extreme viscosity ratios (λ &lt; 0.05 or &gt; 20) and strong inertia (Re<sub>c</sub> &gt; 50) add spread. Satellite droplets are flagged when jetting with Ohnesorge number Oh<sub>d</sub> &lt; 0.1.
+        CV &lt; 5% is called monodisperse, 5–10% moderately monodisperse, &gt; 10% polydisperse.</p>
+      </details>
+      <details>
+        <summary>References</summary>
+        <ol class="refs">
+          <li>A. S. Utada, A. Fernandez-Nieves, H. A. Stone, D. A. Weitz, “Dripping to jetting transitions in coflowing liquid streams,” <em>Phys. Rev. Lett.</em> 99, 094502 (2007). <a href="https://doi.org/10.1103/PhysRevLett.99.094502" target="_blank" rel="noopener">doi:10.1103/PhysRevLett.99.094502</a></li>
+          <li>T. Cubaud, T. G. Mason, “Capillary threads and viscous droplets in square microchannels,” <em>Phys. Fluids</em> 20, 053302 (2008). <a href="https://doi.org/10.1063/1.2911716" target="_blank" rel="noopener">doi:10.1063/1.2911716</a></li>
+          <li>P. Garstecki, M. J. Fuerstman, H. A. Stone, G. M. Whitesides, “Formation of droplets and bubbles in a microfluidic T-junction—scaling and mechanism of break-up,” <em>Lab Chip</em> 6, 437–446 (2006). <a href="https://doi.org/10.1039/b510841a" target="_blank" rel="noopener">doi:10.1039/b510841a</a></li>
+          <li>P. B. Umbanhowar, V. Prasad, D. A. Weitz, “Monodisperse emulsion generation via drop break off in a coflowing stream,” <em>Langmuir</em> 16, 347–351 (2000). <a href="https://doi.org/10.1021/la990101e" target="_blank" rel="noopener">doi:10.1021/la990101e</a></li>
+        </ol>
+      </details>
+      <p style="color:var(--muted);font-size:13px">These are scaling estimates. Real thresholds shift with wetting, surfactant dynamics, channel aspect ratio and junction design, so calibrate against your own device.</p>
+    </div>
+  </section>
+</main>
+
+<script>
+const $ = id => document.getElementById(id);
+const IDS = ['geom','w','h','dtip','D','gamma','Uc','muc','rhoc','Ud','mud','rhod'];
+
+const PRESETS = {
+  hfe: { muc: 1.24, rhoc: 1614, mud: 1,   rhod: 1000, gamma: 5 },
+  min: { muc: 30,   rhoc: 850,  mud: 1,   rhod: 1000, gamma: 4 },
+  sil: { muc: 1,    rhoc: 1000, mud: 48,  rhod: 960,  gamma: 10 },
+  gly: { muc: 3,    rhoc: 773,  mud: 6,   rhod: 1126, gamma: 5 },
+};
+
+const GEOM = {
+  ff: { name: 'Flow-focusing', caStar: 0.2, weStar: 1 },
+  tj: { name: 'T-junction',    caStar: 0.1, weStar: 1 },
+  cf: { name: 'Co-flow',       caStar: 1,   weStar: 1 },
+};
+
+const clamp = (x, a, b) => Math.min(b, Math.max(a, x));
+
+function read() {
+  const p = {};
+  for (const id of IDS) p[id] = id === 'geom' ? $(id).value : parseFloat($(id).value);
+  return p;
+}
+
+function compute(p) {
+  const g = p.geom, G = GEOM[g];
+  const need = ['gamma','Uc','muc','rhoc','Ud','mud','rhod'].concat(g === 'cf' ? ['dtip','D'] : ['w','h']);
+  for (const k of need) if (!(p[k] > 0)) return { error: 'All inputs must be positive numbers.' };
+  if (g === 'cf' && p.D <= p.dtip) return { error: 'Outer channel diameter must be larger than the inner tip diameter.' };
+
+  // SI units
+  const Uc = p.Uc * 1e-3, Ud = p.Ud * 1e-3, muc = p.muc * 1e-3, mud = p.mud * 1e-3, gam = p.gamma * 1e-3;
+  let Ad, Ac, Aout, Ld, Lout, w, h;
+  if (g === 'cf') {
+    const dt = p.dtip * 1e-6, D = p.D * 1e-6;
+    Ad = Math.PI * dt * dt / 4; Ac = Math.PI * (D * D - dt * dt) / 4; Aout = Math.PI * D * D / 4;
+    Ld = dt; Lout = D;
+  } else {
+    w = p.w * 1e-6; h = p.h * 1e-6;
+    Ad = w * h; Ac = (g === 'ff' ? 2 : 1) * w * h; Aout = w * h;
+    Ld = w; Lout = 2 * w * h / (w + h); // hydraulic diameter
+  }
+  const Qd = Ud * Ad, Qc = Uc * Ac, Qr = Qd / Qc;
+  const Ca = muc * Uc / gam;
+  const We = p.rhod * Ud * Ud * Ld / gam;
+  const Rec = p.rhoc * Uc * Lout / muc;
+  const Red = p.rhod * Ud * Ld / mud;
+  const lam = mud / muc;
+  const Oh = mud / Math.sqrt(p.rhod * gam * Ld);
+
+  const caTerm = Ca / G.caStar, weTerm = We / G.weStar;
+  const S = caTerm + weTerm;
+  const t = clamp((S - 0.7) / 0.6, 0, 1);
+  const parallel = g === 'tj' && Qr > 4 && Ca > 0.01;
+  const squeezing = (g === 'tj' || g === 'ff') && Ca < 0.01 && S < 0.7;
+
+  // Dripping size estimate (m)
+  let dDrip;
+  const plugD = (Lplug) => { // equivalent-sphere diameter of a plug w x h x L
+    const V = w * h * Math.max(Lplug - w / 4, w * 0.5);
+    return Math.cbrt(6 * V / Math.PI);
+  };
+  if (g === 'tj') {
+    const d0 = plugD(w * (1 + Qr));
+    dDrip = Ca < 0.01 ? d0 : d0 * Math.pow(Ca / 0.01, -0.25);
+  } else if (g === 'ff') {
+    dDrip = w * 0.9 * Math.pow(Qr, 0.3) * Math.pow(Math.max(Ca, 1e-5), -0.2);
+  } else {
+    const slip = Math.max(Uc - Ud, 0.05 * Uc);
+    const CaP = muc * slip / gam;
+    dDrip = Math.min(Ld * (1 + 1 / (3 * CaP)), Lout);
+  }
+  // Jetting size estimate (m)
+  const dJet = Math.sqrt(4 * Aout / Math.PI * Qd / (Qd + Qc));
+  let dDrop = 1.89 * dJet;
+  const d = Math.exp((1 - t) * Math.log(dDrip) + t * Math.log(dDrop));
+
+  let regime, cls, sub;
+  if (parallel) { regime = 'Jetting'; cls = 'jet'; sub = 'Parallel / stratified flow (high Q_d/Q_c)'; }
+  else if (S < 0.7) { regime = 'Droplets'; cls = 'drip'; sub = squeezing ? 'Squeezing regime (confined plugs)' : 'Dripping regime'; }
+  else if (S < 1.3) { regime = 'Transitional'; cls = 'trans'; sub = 'Near the dripping-to-jetting boundary'; }
+  else { regime = 'Jetting'; cls = 'jet'; sub = weTerm > caTerm ? 'Widening jet (inertia-driven, We-dominated)' : 'Narrowing jet (viscous-driven, Ca-dominated)'; }
+
+  // Dispersity heuristic
+  const base = squeezing ? 1.5 : 2.5;
+  const jetCV = weTerm > caTerm ? 20 : 8;
+  let cv;
+  if (parallel) cv = 25;
+  else if (S < 0.7) cv = base;
+  else if (S < 1.3) cv = base + (jetCV - base) * t;
+  else cv = Math.min(jetCV * (1 + 0.3 * Math.log10(S / 1.3)), 40);
+  if (lam < 0.05 || lam > 20) cv += 1.5;
+  if (Rec > 50 && S < 0.7) cv += 1;
+  const pdi = (cv / 100) ** 2;
+  const dispLabel = cv < 5 ? 'Monodisperse' : cv < 10 ? 'Moderately monodisperse' : 'Polydisperse';
+
+  // Frequency
+  const confined = g === 'cf' ? d >= 0.95 * Lout : d > Math.min(w, h);
+  const f = Qd / (Math.PI * d ** 3 / 6);
+
+  const notes = [];
+  if (confined) notes.push('Droplets are larger than the channel and will be confined (plug/disc-shaped); size shown is the equivalent-sphere diameter.');
+  if (S >= 0.7 && Oh < 0.1) notes.push('Low Ohnesorge number in the dispersed phase: satellite droplets are likely during jet breakup.');
+  if (lam > 20) notes.push('High viscosity ratio (λ > 20) stabilises the thread, delays pinch-off and favours jetting / long threads.');
+  if (lam < 0.05) notes.push('Very low viscosity ratio (λ < 0.05): tip streaming and small satellites are possible at high Ca.');
+  if (Rec > 2000 || Red > 2000) notes.push('Reynolds number above ~2000: flow may not be laminar; these microfluidic scalings no longer apply.');
+  else if (Rec > 50) notes.push('Re_c > 50: inertia is significant and may shift the transition earlier than predicted.');
+  if (g === 'cf' && Ud > Uc && S < 1.3) notes.push('Dispersed phase is faster than the continuous phase; drag-based dripping estimate is less reliable.');
+  if (S >= 0.7 && S < 1.3) notes.push('Close to the boundary, small changes in flow rate can switch regimes. Reduce U_c or U_d for robust dripping.');
+
+  return { G, Qd, Qc, Qr, Ca, We, Rec, Red, lam, Oh, S, caTerm, weTerm, regime, cls, sub, d, cv, pdi, dispLabel, f, notes, g,
+    t, dJet, Uout: (Qd + Qc) / Aout, parallel, squeezing, satellites: S >= 0.7 && Oh < 0.1, widening: weTerm > caTerm };
+}
+
+function fmt(x, digits = 3) {
+  if (!isFinite(x)) return '—';
+  const a = Math.abs(x);
+  if (a !== 0 && (a < 1e-3 || a >= 1e5)) return x.toExponential(2);
+  return Number(x.toPrecision(digits)).toLocaleString();
+}
+function fmtFreq(f) {
+  if (f >= 1e6) return fmt(f / 1e6) + ' MHz';
+  if (f >= 1e3) return fmt(f / 1e3) + ' kHz';
+  return fmt(f) + ' Hz';
+}
+function fmtQ(q) { // m^3/s -> µL/min
+  return fmt(q * 1e9 * 60) + ' µL/min';
+}
+
+function render() {
+  const p = read();
+  $('rect').hidden = p.geom === 'cf';
+  $('coflow').hidden = p.geom !== 'cf';
+  const r = compute(p);
+  if (r.error) {
+    $('verdict').className = 'verdict trans';
+    $('verdict').innerHTML = `<span class="err">${r.error}</span>`;
+    $('kpis').innerHTML = ''; $('notes').innerHTML = ''; $('dimless').innerHTML = '';
+    $('map').innerHTML = ''; $('dist').innerHTML = '';
+    anim.scene = null; drawAnim();
+    return;
+  }
+  anim.scene = buildScene(r, p);
+  drawAnim();
+  $('velnote').textContent = `Flow rates: Q_c = ${fmtQ(r.Qc)}${p.geom === 'ff' ? ' (both side channels)' : ''}, Q_d = ${fmtQ(r.Qd)}.`;
+
+  $('verdict').className = 'verdict ' + r.cls;
+  $('verdict').innerHTML = `<div><div class="tag">${r.regime}</div><div class="sub">${r.sub} · ${r.G.name}</div></div>
+    <div style="margin-left:auto;text-align:right"><div class="sub">Transition parameter S = Ca<sub>c</sub>/Ca* + We<sub>d</sub>/We*</div><div style="font-size:20px;font-weight:650">S = ${fmt(r.S, 2)}</div>
+    <div class="sub">Ca* = ${r.G.caStar}, We* = ${r.G.weStar} for ${r.G.name}</div></div>`;
+
+  $('kpis').innerHTML = [
+    ['Droplet diameter', fmt(r.d * 1e6, 3) + ' µm'],
+    ['Generation rate', fmtFreq(r.f)],
+    ['Dispersity (CV)', fmt(r.cv, 2) + ' %'],
+    ['PDI (CV²)', r.pdi.toFixed(4)],
+    ['Classification', r.dispLabel],
+  ].map(([l, v]) => `<div class="kpi"><div class="l">${l}</div><div class="v" style="${l === 'Classification' ? 'font-size:16px' : ''}">${v}</div></div>`).join('');
+
+  $('notes').innerHTML = r.notes.map(n => `<li class="${n.includes('likely') || n.includes('not be laminar') ? 'warn' : ''}">${n}</li>`).join('');
+
+  const rows = [
+    ['Capillary number, continuous', 'Ca<sub>c</sub> = μ<sub>c</sub>U<sub>c</sub>/γ', r.Ca],
+    ['Weber number, dispersed', 'We<sub>d</sub> = ρ<sub>d</sub>U<sub>d</sub>²L/γ', r.We],
+    ['Reynolds number, continuous', 'Re<sub>c</sub> = ρ<sub>c</sub>U<sub>c</sub>D<sub>h</sub>/μ<sub>c</sub>', r.Rec],
+    ['Reynolds number, dispersed', 'Re<sub>d</sub> = ρ<sub>d</sub>U<sub>d</sub>L/μ<sub>d</sub>', r.Red],
+    ['Viscosity ratio', 'λ = μ<sub>d</sub>/μ<sub>c</sub>', r.lam],
+    ['Flow-rate ratio', 'Q<sub>d</sub>/Q<sub>c</sub>', r.Qr],
+    ['Ohnesorge number, dispersed', 'Oh<sub>d</sub> = μ<sub>d</sub>/√(ρ<sub>d</sub>γL)', r.Oh],
+    ['Critical capillary number', `Ca* (${r.G.name})`, r.G.caStar],
+    ['Critical Weber number', `We* (${r.G.name})`, r.G.weStar],
+    ['Transition parameter', 'S = Ca<sub>c</sub>/Ca* + We<sub>d</sub>/We*', r.S],
+  ];
+  $('dimless').innerHTML = rows.map(([a, b, v]) => `<tr><td>${a}</td><td>${b}</td><td class="num">${fmt(v)}</td></tr>`).join('');
+
+  drawMap(r);
+  drawDist(r);
+}
+
+// ---------- Regime map (log Ca vs log We) ----------
+function drawMap(r) {
+  const W = 420, H = 330, m = { l: 52, r: 14, t: 12, b: 42 };
+  const lx0 = -4, lx1 = 2, ly0 = -4, ly1 = 2;
+  const X = v => m.l + (Math.log10(v) - lx0) / (lx1 - lx0) * (W - m.l - m.r);
+  const Y = v => H - m.b - (Math.log10(v) - ly0) / (ly1 - ly0) * (H - m.t - m.b);
+  const { caStar, weStar } = r.G;
+  const curve = (s) => {
+    const pts = [];
+    for (let i = 0; i <= 120; i++) {
+      const ca = Math.pow(10, lx0 + (lx1 - lx0) * i / 120);
+      const we = weStar * (s - ca / caStar);
+      if (we <= Math.pow(10, ly0)) { pts.push([X(Math.min(s * caStar, 10 ** lx1)), Y(10 ** ly0)]); break; }
+      pts.push([X(ca), Y(Math.min(we, 10 ** ly1))]);
+    }
+    return pts;
+  };
+  const b = curve(1);
+  const poly = b.concat([[X(10 ** lx1), Y(10 ** ly0)], [X(10 ** lx1), Y(10 ** ly1)], [X(10 ** lx0), Y(10 ** ly1)]]);
+  const path = pts => 'M' + pts.map(p => p.map(n => n.toFixed(1)).join(',')).join('L');
+  let s = '';
+  s += `<polygon points="${poly.map(p => p.join(',')).join(' ')}" fill="var(--map-jet)"/>`;
+  for (let e = lx0; e <= lx1; e++) {
+    s += `<line x1="${X(10 ** e)}" x2="${X(10 ** e)}" y1="${m.t}" y2="${H - m.b}" stroke="var(--line)"/>`;
+    s += `<text x="${X(10 ** e)}" y="${H - m.b + 15}" text-anchor="middle">10${sup(e)}</text>`;
+  }
+  for (let e = ly0; e <= ly1; e++) {
+    s += `<line x1="${m.l}" x2="${W - m.r}" y1="${Y(10 ** e)}" y2="${Y(10 ** e)}" stroke="var(--line)"/>`;
+    s += `<text x="${m.l - 6}" y="${Y(10 ** e) + 4}" text-anchor="end">10${sup(e)}</text>`;
+  }
+  s += `<path d="${path(curve(0.7))}" fill="none" stroke="var(--trans)" stroke-dasharray="4 3"/>`;
+  s += `<path d="${path(curve(1.3))}" fill="none" stroke="var(--trans)" stroke-dasharray="4 3"/>`;
+  s += `<path d="${path(b)}" fill="none" stroke="var(--jet)" stroke-width="1.6"/>`;
+  s += `<text x="${m.l + 8}" y="${H - m.b - 10}" style="fill:var(--drip);font-weight:600">DRIPPING</text>`;
+  s += `<text x="${W - m.r - 8}" y="${m.t + 16}" text-anchor="end" style="fill:var(--jet);font-weight:600">JETTING</text>`;
+  s += `<text x="${(m.l + W - m.r) / 2}" y="${H - 6}" text-anchor="middle">Capillary number Ca_c</text>`;
+  s += `<text transform="translate(13,${(m.t + H - m.b) / 2}) rotate(-90)" text-anchor="middle">Weber number We_d</text>`;
+  const px = X(clamp(r.Ca, 10 ** lx0, 10 ** lx1)), py = Y(clamp(r.We, 10 ** ly0, 10 ** ly1));
+  s += `<circle cx="${px}" cy="${py}" r="7" fill="var(--accent)" stroke="var(--panel)" stroke-width="2"/>`;
+  s += `<text x="${px + 10}" y="${py - 9}" style="fill:var(--ink);font-weight:600">your flow</text>`;
+  $('map').innerHTML = s;
+}
+function sup(e) {
+  const map = { '-': '⁻', 0: '⁰', 1: '¹', 2: '²', 3: '³', 4: '⁴', 5: '⁵', 6: '⁶', 7: '⁷', 8: '⁸', 9: '⁹' };
+  return String(e).split('').map(c => map[c]).join('');
+}
+
+// ---------- Size distribution ----------
+function niceTicks(lo, hi, target = 6) {
+  const raw = (hi - lo) / target, mag = Math.pow(10, Math.floor(Math.log10(raw)));
+  const step = [1, 2, 2.5, 5, 10].map(f => f * mag).find(st => st >= raw);
+  const ticks = [];
+  for (let v = Math.ceil(lo / step) * step; v <= hi + step * 1e-9; v += step) ticks.push(+v.toPrecision(12));
+  return { ticks, step };
+}
+function drawDist(r) {
+  const W = 420, H = 330, m = { l: 34, r: 14, t: 24, b: 42 };
+  const mean = r.d * 1e6, sd = mean * r.cv / 100;
+  // Fixed, user-set axis so the distribution visibly shifts as inputs change.
+  let x0 = parseFloat($('xmin').value), x1 = parseFloat($('xmax').value);
+  if (!(x0 >= 0)) x0 = 0;
+  if (!(x1 > x0)) x1 = x0 + 200;
+  const ticks = niceTicks(x0, x1).ticks;
+  const X = v => m.l + (v - x0) / (x1 - x0) * (W - m.l - m.r);
+  const pdf = v => Math.exp(-0.5 * ((v - mean) / sd) ** 2);
+  const Y = v => H - m.b - v * (H - m.t - m.b);
+  // sample evenly across the axis plus densely around the peak so narrow peaks stay sharp
+  const xs = [];
+  for (let i = 0; i <= 600; i++) xs.push(x0 + (x1 - x0) * i / 600);
+  for (let i = -200; i <= 200; i++) xs.push(mean + sd * 5 * i / 200);
+  const pts = xs.filter(v => v >= x0 && v <= x1).sort((a, b) => a - b).map(v => [X(v), Y(pdf(v))]);
+  const col = r.cv < 5 ? 'var(--drip)' : r.cv < 10 ? 'var(--trans)' : 'var(--jet)';
+  const dec = Math.max(0, -Math.floor(Math.log10(ticks[1] - ticks[0])));
+  let s = '';
+  for (const v of ticks) {
+    s += `<line x1="${X(v)}" x2="${X(v)}" y1="${m.t}" y2="${H - m.b}" stroke="var(--line)"/>`;
+    s += `<line x1="${X(v)}" x2="${X(v)}" y1="${H - m.b}" y2="${H - m.b + 4}" stroke="var(--muted)"/>`;
+    s += `<text x="${X(v)}" y="${H - m.b + 16}" text-anchor="middle">${v.toFixed(dec)}</text>`;
+  }
+  s += `<path d="M${X(x0)},${Y(0)}L${pts.map(p => p.map(n => n.toFixed(1)).join(',')).join('L')}L${X(x1)},${Y(0)}Z" fill="${col}" fill-opacity=".18" stroke="${col}" stroke-width="1.8"/>`;
+  s += `<line x1="${m.l}" x2="${W - m.r}" y1="${H - m.b}" y2="${H - m.b}" stroke="var(--muted)"/>`;
+  if (mean >= x0 && mean <= x1) {
+    const mx = X(mean), anchor = mx < m.l + 50 ? 'start' : mx > W - m.r - 50 ? 'end' : 'middle';
+    s += `<line x1="${mx}" x2="${mx}" y1="${m.t}" y2="${H - m.b}" stroke="var(--ink)" stroke-dasharray="3 3"/>`;
+    s += `<text x="${mx}" y="${m.t - 6}" text-anchor="${anchor}" style="fill:var(--ink)">mean ${fmt(mean, 3)} µm</text>`;
+  } else {
+    const right = mean > x1;
+    s += `<text x="${right ? W - m.r - 4 : m.l + 4}" y="${(m.t + H - m.b) / 2}" text-anchor="${right ? 'end' : 'start'}" style="fill:var(--jet);font-weight:600">${right ? '' : '← '}mean ${fmt(mean, 3)} µm is off-scale${right ? ' →' : ''}</text>`;
+  }
+  s += `<text x="${(m.l + W - m.r) / 2}" y="${H - 6}" text-anchor="middle">Droplet diameter (µm)</text>`;
+  s += `<text transform="translate(14,${(m.t + H - m.b) / 2}) rotate(-90)" text-anchor="middle">Relative frequency</text>`;
+  s += `<text x="${W - m.r - 4}" y="${m.t + 14}" text-anchor="end" style="fill:var(--ink);font-weight:600">CV ${r.cv.toFixed(1)}%</text>`;
+  s += `<text x="${W - m.r - 4}" y="${m.t + 29}" text-anchor="end">${r.dispLabel}</text>`;
+  $('dist').innerHTML = s;
+}
+
+// ---------- Device drawing & flow animation ----------
+const CW = 760, CH = 240, VPX = 90; // canvas logical size, visual flow speed (px/s)
+const anim = { scene: null, t: 0, last: null, colors: {},
+  playing: !matchMedia('(prefers-reduced-motion: reduce)').matches };
+
+function readColors() {
+  const cs = getComputedStyle(document.documentElement);
+  for (const n of ['panel','line','muted','ink','cont','disp','glass','wall','chip']) anim.colors[n] = cs.getPropertyValue('--' + n).trim();
+}
+function rnd(k) { const x = Math.sin(k * 12.9898 + 78.233) * 43758.5453; return x - Math.floor(x); }
+function gauss(k) { return Math.sqrt(-2 * Math.log(rnd(k) + 1e-9)) * Math.cos(2 * Math.PI * rnd(k + 0.37)); }
+
+function buildScene(r, p) {
+  const s = { g: p.geom, r, cv: r.cv / 100 };
+  if (p.geom === 'cf') {
+    s.yc = CH / 2; s.R = 60; s.chanH = 2 * s.R;
+    s.scale = (p.D * 1e-6) / s.chanH;                       // m per px
+    s.rtip = Math.min(Math.max(1.5, p.dtip * 1e-6 / s.scale / 2), s.R * 0.8);
+    s.x0 = 240; s.top = s.yc - s.R; s.bot = s.yc + s.R;
+    s.Ach = Math.PI * (p.D * 1e-6) ** 2 / 4;
+  } else {
+    s.W = 50; s.chanH = s.W; s.jx = 230;
+    s.yc = p.geom === 'tj' ? 150 : CH / 2;
+    s.top = s.yc - s.W / 2; s.bot = s.yc + s.W / 2;
+    s.scale = (p.w * 1e-6) / s.W;
+    s.x0 = s.jx - s.W / 2;
+    s.wR = p.w * 1e-6; s.hR = p.h * 1e-6; s.Ach = s.wR * s.hR;
+  }
+  // Top-view shape (px) of a drop of real diameter d: sphere, pancake disc, or confined plug
+  s.shape = d => {
+    const V = Math.PI * d ** 3 / 6, hh = s.chanH * 0.86;
+    if (s.g === 'cf') {
+      if (d < 0.9 * p.D * 1e-6) return { w: d / s.scale, h: d / s.scale, plug: false };
+    } else {
+      if (d < 0.9 * Math.min(s.wR, s.hR)) return { w: d / s.scale, h: d / s.scale, plug: false };
+      const disc = Math.sqrt(4 * V / (Math.PI * s.hR * 0.8));
+      if (disc < 0.9 * s.wR) return { w: disc / s.scale, h: disc / s.scale, plug: false };
+    }
+    const L = V / (s.Ach * 0.8) / s.scale;
+    return { w: clamp(L, hh, 600), h: hh, plug: true };
+  };
+
+  if (r.parallel) s.mode = 'parallel';
+  else if (r.cls === 'jet') s.mode = 'jet';
+  else s.mode = 'drip';
+
+  if (s.mode === 'drip') {
+    s.dMean = r.d;
+    const sh = s.shape(r.d);
+    const spacing = r.Uout / r.f / s.scale;                 // real centre-to-centre spacing, px
+    s.spacing = clamp(spacing, sh.w * 1.15 + 6, 900);
+    s.period = s.spacing / VPX;
+    s.neck = (s.g === 'ff' ? s.W * 0.5 : 0) + (r.cls === 'trans' ? r.t * s.chanH * 1.2 : 0);
+    s.neckW = s.g === 'cf' ? 2 * s.rtip : s.g === 'ff' ? s.W * 0.55 : 0;
+  } else if (s.mode === 'jet') {
+    s.dj = Math.max(2, r.dJet / s.scale);
+    s.dMean = 1.89 * r.dJet;
+    const sh = s.shape(s.dMean);
+    s.lam = Math.max(4.5 * s.dj, sh.w + 4);
+    const room = CW - (s.x0 + (s.g === 'ff' ? s.W : 0)) - Math.max(160, sh.w * 1.6);
+    s.r0 = s.g === 'cf' ? s.rtip : s.g === 'ff' ? Math.min(s.W * 0.3, Math.max(s.dj / 2, 3)) : s.dj / 2;
+    s.Lb = clamp(s.chanH * (1.6 + 2.5 * Math.log10(r.S / 1.3 + 1)) * (r.widening ? 1.5 : 1), 60, room);
+    s.jetX = s.x0 + (s.g === 'ff' ? s.W : 0);
+    s.jy = s.g === 'tj' ? s.top + s.dj / 2 + 1 : s.yc;
+  }
+  const realPxPerS = r.Uout / s.scale;
+  const slow = realPxPerS / VPX;
+  const scaleTxt = s.g === 'cf' ? `tube Ø ${p.D} µm` : `channel ${p.w} µm wide`;
+  $('animnote').textContent = `Drawn to scale (${scaleTxt}). ` +
+    (slow >= 1 ? `Slowed down ~${fmt(slow, 2)}× vs. real flow.` : `Sped up ~${fmt(1 / slow, 2)}× vs. real flow.`);
+  return s;
+}
+
+function sizeCanvas() {
+  const c = $('anim'), dpr = window.devicePixelRatio || 1;
+  const w = c.clientWidth || CW;
+  c.width = Math.round(w * dpr); c.height = Math.round(w * CH / CW * dpr);
+  c.getContext('2d').setTransform(c.width / CW, 0, 0, c.height / CH, 0, 0);
+}
+
+function shapePath(ctx, cx, cy, w, h, plug) {
+  ctx.beginPath();
+  if (!plug) { ctx.ellipse(cx, cy, Math.max(w / 2, 0.5), Math.max(h / 2, 0.5), 0, 0, 2 * Math.PI); return; }
+  const rr = Math.min(h / 2, w / 2), x = cx - w / 2, y = cy - h / 2;
+  ctx.moveTo(x + rr, y); ctx.lineTo(x + w - rr, y); ctx.arc(x + w - rr, cy, rr, -Math.PI / 2, Math.PI / 2);
+  ctx.lineTo(x + rr, y + h); ctx.arc(x + rr, cy, rr, Math.PI / 2, 3 * Math.PI / 2); ctx.closePath();
+}
+
+function drawDevice(ctx, s) {
+  const C = anim.colors;
+  ctx.fillStyle = C.chip; ctx.fillRect(0, 0, CW, CH);
+  ctx.lineWidth = 2; ctx.strokeStyle = C.wall;
+  const line = pts => { ctx.beginPath(); ctx.moveTo(...pts[0]); for (const q of pts.slice(1)) ctx.lineTo(...q); ctx.stroke(); };
+  ctx.font = '12px system-ui, sans-serif'; ctx.fillStyle = C.muted;
+  if (s.g === 'ff') {
+    const { jx, W, top, bot } = s;
+    ctx.fillStyle = C.cont;
+    ctx.fillRect(jx - W / 2, 0, W, CH); ctx.fillRect(jx - W / 2, top, CW, W);
+    ctx.fillStyle = C.disp; ctx.fillRect(0, top, jx - W / 2, W);
+    line([[0, top], [jx - W / 2, top], [jx - W / 2, 0]]); line([[jx + W / 2, 0], [jx + W / 2, top], [CW, top]]);
+    line([[0, bot], [jx - W / 2, bot], [jx - W / 2, CH]]); line([[jx + W / 2, CH], [jx + W / 2, bot], [CW, bot]]);
+    ctx.fillStyle = C.muted;
+    ctx.fillText('Dispersed →', 10, top - 8);
+    ctx.fillText('Continuous ↓', jx + W / 2 + 8, 18);
+    ctx.fillText('Continuous ↑', jx + W / 2 + 8, CH - 10);
+    ctx.fillText('Outlet →', CW - 64, bot + 18);
+  } else if (s.g === 'tj') {
+    const { jx, W, top, bot } = s;
+    ctx.fillStyle = C.cont; ctx.fillRect(0, top, CW, W);
+    ctx.fillStyle = C.disp; ctx.fillRect(jx - W / 2, 0, W, top);
+    line([[0, top], [jx - W / 2, top], [jx - W / 2, 0]]); line([[jx + W / 2, 0], [jx + W / 2, top], [CW, top]]);
+    line([[0, bot], [CW, bot]]);
+    ctx.fillStyle = C.muted;
+    ctx.fillText('Continuous →', 10, top - 8);
+    ctx.fillText('Dispersed ↓', jx + W / 2 + 8, 18);
+    ctx.fillText('Outlet →', CW - 64, bot + 18);
+  } else {
+    const { yc, R, x0, rtip } = s;
+    ctx.fillStyle = C.cont; ctx.fillRect(0, yc - R, CW, 2 * R);
+    ctx.fillStyle = C.glass; ctx.fillRect(0, yc - R - 7, CW, 7); ctx.fillRect(0, yc + R, CW, 7);
+    // tapered inner capillary
+    const ro0 = Math.max(R * 0.6, rtip + 6), ri0 = Math.max(R * 0.48, rtip);
+    const ro1 = rtip + 3;
+    ctx.fillStyle = C.glass; ctx.beginPath();
+    ctx.moveTo(0, yc - ro0); ctx.lineTo(x0 * 0.45, yc - ro0); ctx.lineTo(x0, yc - ro1);
+    ctx.lineTo(x0, yc + ro1); ctx.lineTo(x0 * 0.45, yc + ro0); ctx.lineTo(0, yc + ro0); ctx.closePath(); ctx.fill();
+    ctx.fillStyle = C.disp; ctx.beginPath();
+    ctx.moveTo(0, yc - ri0); ctx.lineTo(x0 * 0.45, yc - ri0); ctx.lineTo(x0, yc - rtip);
+    ctx.lineTo(x0, yc + rtip); ctx.lineTo(x0 * 0.45, yc + ri0); ctx.lineTo(0, yc + ri0); ctx.closePath(); ctx.fill();
+    ctx.fillStyle = C.muted;
+    ctx.fillText('Continuous →', 10, yc - R + 15);
+    ctx.fillText('Dispersed →', 10, yc + 4);
+    ctx.fillText('Outlet →', CW - 64, yc + R + 22);
+  }
+}
+
+function drawFlow(ctx, s, t) {
+  const C = anim.colors;
+  ctx.fillStyle = C.disp;
+  if (s.mode === 'parallel') {
+    const bandH = s.W * clamp(s.r.Qr / (1 + s.r.Qr), 0.2, 0.85);
+    ctx.beginPath(); ctx.moveTo(s.jx - s.W / 2, s.top);
+    for (let x = s.jx - s.W / 2; x <= CW; x += 4) ctx.lineTo(x, s.top + bandH + 1.5 * Math.sin((x - VPX * t) / 18));
+    ctx.lineTo(CW, s.top); ctx.closePath(); ctx.fill();
+    return;
+  }
+  if (s.mode === 'jet') {
+    const { jetX, Lb, lam, dj, jy } = s, rj = dj / 2;
+    // varicose (Rayleigh–Plateau) thread with growing modulation
+    const top = [], bot = [];
+    for (let x = jetX; x <= jetX + Lb; x += 1.5) {
+      const a = 0.9 * ((x - jetX) / Lb) ** 2;
+      const u = Math.min(1, (x - jetX) / Math.min(50, Lb * 0.3)), ramp = u * u * (3 - 2 * u);
+      const base = s.r0 + (rj - s.r0) * ramp;              // jet relaxes from tip/orifice size to its final width
+      const hw = base * (1 + a * Math.sin(2 * Math.PI * (x - jetX - VPX * t) / lam));
+      top.push([x, jy - hw]); bot.push([x, jy + hw]);
+    }
+    if (s.g === 'ff') { ctx.fillRect(s.x0, s.yc - s.r0, s.W, 2 * s.r0); }
+    ctx.beginPath(); ctx.moveTo(...top[0]); for (const q of top) ctx.lineTo(...q);
+    for (const q of bot.reverse()) ctx.lineTo(...q); ctx.closePath(); ctx.fill();
+    const T = lam / VPX, k = Math.floor(t / T);
+    for (let j = k; j > k - 400; j--) {
+      const age = t - j * T;
+      const sh = s.shape(s.dMean * Math.max(0.3, 1 + s.cv * gauss(j)));
+      const cx = jetX + Lb + sh.w / 2 + age * VPX;
+      if (cx - sh.w / 2 > CW) break;
+      const cy = s.g === 'tj' ? Math.min(s.top + sh.h / 2 + 1, s.yc) : jy;
+      shapePath(ctx, cx, cy, sh.w, sh.h, sh.plug); ctx.fill();
+      if (s.r.satellites) {
+        const sr = Math.max(1, sh.h * 0.13);
+        shapePath(ctx, cx - lam / 2, cy, 2 * sr, 2 * sr, false); ctx.fill();
+      }
+    }
+    return;
+  }
+  // dripping / transitional
+  const T = s.period, k = Math.floor(t / T), phi = (t - k * T) / T;
+  const startX = s.x0 + s.neck;
+  const yFor = (sh, age) => {
+    if (s.g !== 'tj' || sh.plug) return s.yc;
+    const y0 = s.top + sh.h / 2, f = clamp(age * VPX / 80, 0, 1);
+    return Math.min(y0 + (s.yc - y0) * f, s.yc);
+  };
+  for (let j = k; j > k - 400; j--) {
+    const age = t - j * T;
+    const sh = s.shape(s.dMean * Math.max(0.3, 1 + s.cv * gauss(j)));
+    const cx = startX + sh.w / 2 + age * VPX;
+    if (cx - sh.w / 2 > CW) break;
+    shapePath(ctx, cx, yFor(sh, age), sh.w, sh.h, sh.plug); ctx.fill();
+  }
+  // drop currently forming (index k+1)
+  const sh = s.shape(s.dMean * Math.max(0.3, 1 + s.cv * gauss(k + 1)));
+  const g = Math.cbrt(Math.max(phi, 0.02));
+  const fw = sh.w * g, fh = sh.h * g;
+  const fy = s.g === 'tj' && !sh.plug ? s.top + fh / 2 : s.yc;
+  if (s.neckW > 0) {
+    const th = Math.max(1.2, s.neckW * (1 - 0.85 * phi ** 3));
+    ctx.fillRect(s.x0, s.yc - th / 2, s.neck + fw * 0.3 + 1, th);
+  }
+  shapePath(ctx, startX + fw / 2, fy, fw, fh, sh.plug); ctx.fill();
+}
+
+function drawAnim() {
+  const c = $('anim'), ctx = c.getContext('2d');
+  ctx.save(); ctx.setTransform(1, 0, 0, 1, 0, 0); ctx.clearRect(0, 0, c.width, c.height); ctx.restore();
+  const s = anim.scene;
+  if (!s) return;
+  drawDevice(ctx, s);
+  drawFlow(ctx, s, anim.t);
+}
+
+function loop(ts) {
+  if (anim.last != null && anim.playing) anim.t += Math.min(0.1, (ts - anim.last) / 1000);
+  anim.last = ts;
+  if (anim.playing) drawAnim();
+  requestAnimationFrame(loop);
+}
+
+$('play').textContent = anim.playing ? 'Pause' : 'Play';
+$('play').addEventListener('click', () => {
+  anim.playing = !anim.playing;
+  $('play').textContent = anim.playing ? 'Pause' : 'Play';
+});
+window.addEventListener('resize', () => { sizeCanvas(); drawAnim(); });
+matchMedia('(prefers-color-scheme: dark)').addEventListener('change', () => { readColors(); drawAnim(); });
+readColors(); sizeCanvas();
+requestAnimationFrame(loop);
+
+// ---------- Wiring ----------
+for (const id of ['xmin', 'xmax']) $(id).addEventListener('input', render);
+$('preset').addEventListener('change', e => {
+  const pr = PRESETS[e.target.value];
+  if (pr) for (const k in pr) $(k).value = pr[k];
+  render();
+});
+for (const id of IDS) {
+  $(id).addEventListener('input', () => {
+    if (['muc','rhoc','mud','rhod','gamma'].includes(id)) $('preset').value = '';
+    render();
+  });
+}
+render();
+</script>
+</body>
+</html>
